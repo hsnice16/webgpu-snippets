@@ -4,7 +4,16 @@ import { mat4, vec3 } from "gl-matrix";
 import { useEffect, useRef, useState } from "react";
 
 import { checkWebGPUSupport } from "@/utils";
+import {
+  createIndexBuffer,
+  createVertexBuffer,
+  createUniformBuffer,
+  createVertexBufferLayoutDesc,
+} from "@/utils/misc";
+
 import code from "./shaders/vercel-logo-shaders.wgsl";
+
+const SAMPLE_COUNT = 4;
 
 export function VercelLogoCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -39,6 +48,7 @@ export function VercelLogoCanvas() {
 
         context.configure({
           device,
+          alphaMode: "opaque",
           format: canvasFormat,
         });
 
@@ -49,47 +59,38 @@ export function VercelLogoCanvas() {
           0.0, 0.75, 0.0,
 
           // 1: front-right (front + right)
-          0.75, -0.75, 0.75,
+          0.5, -0.75, 0.5,
 
           // 2: front-left (front + left)
-          -0.75, -0.75, 0.75,
+          -0.5, -0.75, 0.5,
 
           // 3: back-right (right + back)
-          0.75, -0.75, -0.75,
+          0.5, -0.75, -0.5,
 
           // 4: back-left (left + back)
-          -0.75, -0.75, -0.75,
+          -0.5, -0.75, -0.5,
         ]);
 
-        const positionBuffer = device.createBuffer({
-          label: "Position Buffer Descriptor",
-          size: positions.byteLength,
-          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });
+        const positionBuffer = createVertexBuffer(
+          device,
+          positions.byteLength,
+          "Position Buffer Descriptor"
+        );
 
         device.queue.writeBuffer(positionBuffer, 0, positions);
 
-        const positionAttribDesc = {
-          label: "Position Attribute Descriptor",
-          shaderLocation: 0, // @location(0)
-          offset: 0,
-          format: "float32x3" as GPUVertexFormat,
-        };
-
-        const positionBufferLayoutDesc = {
-          label: "Position Buffer Layout Descriptor",
-          attributes: [positionAttribDesc],
-          arrayStride: 4 * 3, // sizeof(float) * 3
-          stepMode: "vertex" as GPUVertexStepMode,
-        };
+        const positionBufferLayoutDesc = createVertexBufferLayoutDesc({
+          attribDescLabel: "Position Attribute Descriptor",
+          bufferLayoutDescLabel: "Position Buffer Layout Descriptor",
+        });
 
         const indices = new Uint16Array([0, 1, 2, 0, 3, 1, 0, 2, 4, 0, 4, 3]);
 
-        const indexBuffer = device.createBuffer({
-          label: "Index Buffer",
-          size: indices.byteLength,
-          usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-        });
+        const indexBuffer = createIndexBuffer(
+          device,
+          indices.byteLength,
+          "Index Buffer"
+        );
 
         device.queue.writeBuffer(indexBuffer, 0, indices);
 
@@ -110,47 +111,39 @@ export function VercelLogoCanvas() {
           0.5773503, -0.5773503, 0.5773503,
         ]);
 
-        const normalBuffer = device.createBuffer({
-          label: "Normal Buffer Descriptor",
-          size: normals.byteLength,
-          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });
+        const normalBuffer = createVertexBuffer(
+          device,
+          normals.byteLength,
+          "Normal Buffer Descriptor"
+        );
 
         device.queue.writeBuffer(normalBuffer, 0, normals);
 
-        const normalAttribDesc = {
-          label: "Normal Attribute Descriptor",
-          shaderLocation: 1, // @location(1)
-          offset: 0,
-          format: "float32x3" as GPUVertexFormat,
-        };
-
-        const normalBufferLayoutDesc = {
-          label: "Normal Buffer Layout Descriptor",
-          attributes: [normalAttribDesc],
-          arrayStride: 4 * 3, // sizeof(float) * 3
-          stepMode: "vertex" as GPUVertexStepMode,
-        };
+        const normalBufferLayoutDesc = createVertexBufferLayoutDesc({
+          shaderLocation: 1,
+          attribDescLabel: "Normal Attribute Descriptor",
+          bufferLayoutDescLabel: "Normal Buffer Layout Descriptor",
+        });
 
         ////////////////*********** Uniform Buffers ***********////////////////
 
         const lightDirection = new Float32Array([-1.0, -1.0, -1.0]);
 
-        const lightDirectionBuffer = device.createBuffer({
-          label: "Light Direction Buffer Descriptor",
-          size: lightDirection.byteLength,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
+        const lightDirectionBuffer = createUniformBuffer(
+          device,
+          lightDirection.byteLength,
+          "Light Direction Buffer Descriptor"
+        );
 
         device.queue.writeBuffer(lightDirectionBuffer, 0, lightDirection);
 
         const viewDirection = new Float32Array([-1.0, -1.0, -1.0]);
 
-        const viewDirectionBuffer = device.createBuffer({
-          label: "View Direction Buffer Descriptor",
-          size: viewDirection.byteLength,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
+        const viewDirectionBuffer = createUniformBuffer(
+          device,
+          viewDirection.byteLength,
+          "View Direction Buffer Descriptor"
+        );
 
         ////////////////*********** Model View Matrix ***********////////////////
 
@@ -173,11 +166,11 @@ export function VercelLogoCanvas() {
           modelViewMatrixInverse!
         );
 
-        const normalMatrixBuffer = device.createBuffer({
-          label: "Normal Matirx Buffer Descriptor",
-          size: normalMatrix.length * 4, // 16 floats * 4 bytes
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
+        const normalMatrixBuffer = createUniformBuffer(
+          device,
+          normalMatrix.length * 4, // 16 floats * 4 bytes,
+          "Normal Matirx Buffer Descriptor"
+        );
 
         device.queue.writeBuffer(
           normalMatrixBuffer,
@@ -201,11 +194,11 @@ export function VercelLogoCanvas() {
           modelViewMatrix
         );
 
-        const modelViewProjectionMatrixBuffer = device.createBuffer({
-          label: "Model View Projection Matrix Buffer Descriptor",
-          size: modelViewProjectionMatrix.length * 4, // 16 floats * 4 bytes
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
+        const modelViewProjectionMatrixBuffer = createUniformBuffer(
+          device,
+          modelViewProjectionMatrix.length * 4, // 16 floats * 4 bytes
+          "Model View Projection Matrix Buffer Descriptor"
+        );
 
         device.queue.writeBuffer(
           modelViewProjectionMatrixBuffer,
@@ -301,15 +294,15 @@ export function VercelLogoCanvas() {
             format: "depth24plus-stencil8",
           },
           multisample: {
-            count: 4,
+            count: SAMPLE_COUNT,
           },
         });
 
         ////////////////*********** Multi-Sample Anti-Aliasing (MSAA) ***********////////////////
 
         const msaaTexture = device.createTexture({
-          sampleCount: 4,
           format: canvasFormat,
+          sampleCount: SAMPLE_COUNT,
           usage: GPUTextureUsage.RENDER_ATTACHMENT,
           label: "Multi-Sample Anti-Aliasing Texture",
           size: [canvasRef.current.width, canvasRef.current.height],
@@ -318,9 +311,9 @@ export function VercelLogoCanvas() {
         ////////////////*********** Depth Texture ***********////////////////
 
         const depthTexture = device.createTexture({
-          sampleCount: 4,
           dimension: "2d",
           label: "Depth Texture",
+          sampleCount: SAMPLE_COUNT,
           format: "depth24plus-stencil8",
           usage: GPUTextureUsage.RENDER_ATTACHMENT,
           size: [canvasRef.current.width, canvasRef.current.height, 1],
@@ -332,21 +325,21 @@ export function VercelLogoCanvas() {
         const renderPass = commandEncoder.beginRenderPass({
           colorAttachments: [
             {
-              view: msaaTexture.createView(),
-              resolveTarget: context.getCurrentTexture().createView(),
               loadOp: "clear",
-              clearValue: { r: 0, g: 0, b: 0, a: 1 },
               storeOp: "store",
+              view: msaaTexture.createView(),
+              clearValue: { r: 0, g: 0, b: 0, a: 1 },
+              resolveTarget: context.getCurrentTexture().createView(),
             },
           ],
           depthStencilAttachment: {
-            view: depthTexture.createView(),
             depthClearValue: 1,
             depthLoadOp: "clear",
             depthStoreOp: "store",
             stencilClearValue: 0,
             stencilLoadOp: "clear",
             stencilStoreOp: "store",
+            view: depthTexture.createView(),
           },
         });
 
@@ -364,12 +357,20 @@ export function VercelLogoCanvas() {
   }, []);
 
   return (
-    <section>
-      {message ? (
-        <h4>{message}</h4>
-      ) : (
-        <canvas ref={canvasRef} className="min-h-screen w-full" />
-      )}
+    <section className="flex items-center justify-center bg-black min-h-screen w-full">
+      <div className="text-white flex-1 flex flex-col gap-4 items-center justify-start text-left h-[250]">
+        <h2 className="text-5xl font-geist-mono w-[500]">Vercel</h2>
+        <p className="text-2xl font-geist-sans w-[500]">
+          Build and deploy on the AI Cloud.
+        </p>
+      </div>
+      <div className="text-white flex-1 flex items-center justify-center">
+        {message ? (
+          <h4 className="font-geist-sans">{message}</h4>
+        ) : (
+          <canvas ref={canvasRef} width={550} height={550} />
+        )}
+      </div>
     </section>
   );
 }
