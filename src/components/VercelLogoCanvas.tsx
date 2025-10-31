@@ -45,57 +45,20 @@ export function VercelLogoCanvas() {
         ////////////////*********** Buffers ***********////////////////
 
         const positions = new Float32Array([
-          // Front face
-          0.0,
-          0.75,
-          0.0, // top
+          // 0: top
+          0.0, 0.75, 0.0,
 
-          0.75,
-          -0.75,
-          0.75, // front-right
+          // 1: front-right (front + right)
+          0.75, -0.75, 0.75,
 
-          -0.75,
-          -0.75,
-          0.75, // front-left
+          // 2: front-left (front + left)
+          -0.75, -0.75, 0.75,
 
-          // Right face
-          0.0,
-          0.75,
-          0.0, // top
+          // 3: back-right (right + back)
+          0.75, -0.75, -0.75,
 
-          0.75,
-          -0.75,
-          -0.75, // back-right
-
-          0.75,
-          -0.75,
-          0.75, // front-right
-
-          // Left face
-          0.0,
-          0.75,
-          0.0, // top
-
-          -0.75,
-          -0.75,
-          0.75, // front-left
-
-          -0.75,
-          -0.75,
-          -0.75, // back-left
-
-          // Back face
-          0.0,
-          0.75,
-          0.0, // top
-
-          -0.75,
-          -0.75,
-          -0.75, // back-left
-
-          0.75,
-          -0.75,
-          -0.75, // back-right
+          // 4: back-left (left + back)
+          -0.75, -0.75, -0.75,
         ]);
 
         const positionBuffer = device.createBuffer({
@@ -120,58 +83,31 @@ export function VercelLogoCanvas() {
           stepMode: "vertex" as GPUVertexStepMode,
         };
 
+        const indices = new Uint16Array([0, 1, 2, 0, 3, 1, 0, 2, 4, 0, 4, 3]);
+
+        const indexBuffer = device.createBuffer({
+          label: "Index Buffer",
+          size: indices.byteLength,
+          usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+        });
+
+        device.queue.writeBuffer(indexBuffer, 0, indices);
+
         const normals = new Float32Array([
-          // Front face
-          0.0,
-          -0.4472136,
-          -0.8944272, // top
+          // 0: top (average of 4 faces)
+          0.0, -1.0, 0.0,
 
-          0.0,
-          -0.4472136,
-          -0.8944272, // front-right
+          // 1: front-right (front + right, normalized)
+          -0.5773503, -0.5773503, -0.5773503,
 
-          0.0,
-          -0.4472136,
-          -0.8944272, // front-left
+          // 2: front-left (front + left)
+          0.5773503, -0.5773503, -0.5773503,
 
-          // Right face
-          -0.8944272,
-          -0.4472136,
-          0.0, // top
+          // 3: back-right (right + back)
+          -0.5773503, -0.5773503, 0.5773503,
 
-          -0.8944272,
-          -0.4472136,
-          0.0, // back-right
-
-          -0.8944272,
-          -0.4472136,
-          0.0, // front-right
-
-          // Left face
-          0.8944272,
-          -0.4472136,
-          0.0, // top
-
-          0.8944272,
-          -0.4472136,
-          0.0, // front-left
-
-          0.8944272,
-          -0.4472136,
-          0.0, // back-left
-
-          // Back face
-          0.0,
-          -0.4472136,
-          0.8944272, // top
-
-          0.0,
-          -0.4472136,
-          0.8944272, // back-left
-
-          0.0,
-          -0.4472136,
-          0.8944272, // back-right
+          // 4: back-left (left + back)
+          0.5773503, -0.5773503, 0.5773503,
         ]);
 
         const normalBuffer = device.createBuffer({
@@ -347,9 +283,10 @@ export function VercelLogoCanvas() {
         renderPass.setVertexBuffer(0, positionBuffer);
         renderPass.setVertexBuffer(1, normalBuffer);
         renderPass.setBindGroup(0, bindGroup);
-        renderPass.draw(12);
-        renderPass.end();
+        renderPass.setIndexBuffer(indexBuffer, "uint16");
+        renderPass.drawIndexed(indices.length);
 
+        renderPass.end();
         device.queue.submit([commandEncoder.finish()]);
       }
     })();
