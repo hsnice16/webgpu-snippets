@@ -1,6 +1,35 @@
 @group(0) @binding(0)
 var<uniform> modelViewProjectionMatrix: mat4x4<f32>;
 
+@group(0) @binding(1)
+var<uniform> normalMatrix: mat4x4<f32>;
+
+@group(0) @binding(2)
+var<uniform> lightDirection: vec3<f32>;
+
+@group(0) @binding(3)
+var<uniform> viewDirection: vec3<f32>;
+
+const ambientColor: vec4<f32> = vec4<f32>(0.85, 0.85, 0.85, 1.0);
+const diffuseColor: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+const specularColor: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+
+const shininess: f32 = 20.0;
+
+const diffuseConstant: f32 = 1.0;
+const specularConstant: f32 = 1.0;
+const ambientConstant: f32 = 1.0;
+
+fn specular(lightDir: vec3<f32>, viewDir: vec3<f32>, normal: vec3<f32>, specularColor: vec3<f32>, shininess: f32) -> vec3<f32> {
+  var reflectDir: vec3<f32> = reflect(-lightDir, normal);
+  var specDot: f32 = max(dot(reflectDir, viewDir), 0.0);
+  return pow(specDot, shininess) * specularColor;
+}
+
+fn diffuse(lightDir: vec3<f32>, normal: vec3<f32>, diffuseColor: vec3<f32>) -> vec3<f32> {
+  return max(dot(lightDir, normal), 0.0) * diffuseColor;
+}
+
 struct VertexInput {
   @location(0) pos: vec3<f32>,
   @location(1) nrm: vec3<f32>,
@@ -9,6 +38,8 @@ struct VertexInput {
 struct VertexOutput {
   @builtin(position) clip_position: vec4<f32>,
   @location(0) normal: vec3<f32>,
+  @location(1) viewDir: vec3<f32>,
+  @location(2) lightDir: vec3<f32>
 };
 
 @vertex
@@ -16,18 +47,23 @@ fn vs_main(in: VertexInput) -> VertexOutput {
   let pos = vec4<f32>(in.pos, 1.0);
   var out: VertexOutput;
 
-  out.clip_position = modelViewProjectionMatrix * pos;
-  out.normal = normalize(in.nrm);
+  out.normal = normalize((normalMatrix * vec4<f32>(in.nrm, 0.0)).xyz);
+  out.viewDir = normalize((normalMatrix * vec4<f32>(-viewDirection, 0.0)).xyz);
+  out.lightDir = normalize((normalMatrix * vec4<f32>(-lightDirection, 0.0)).xyz);
 
+  out.clip_position = modelViewProjectionMatrix * pos;
   return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput, @builtin(front_facing) face: bool) -> @location(0) vec4<f32> {
-  if(face) {
-    let normal = normalize(in.normal);
-    return vec4<f32>(normal, 1.0);
-  }
+  var lightDir: vec3<f32> = in.lightDir;
+  var n: vec3<f32> = normalize(in.normal);
+  var viewDir: vec3<f32> = in.viewDir;
 
-  return vec4<f32>(1.0, 1.0, 1.0, 1.0);
+  var radiance: vec3<f32> = ambientColor.rgb * ambientConstant + 
+  diffuse(lightDir, n, diffuseColor.rgb) * diffuseConstant + 
+  specular(lightDir, viewDir, n, specularColor.rgb, shininess) * specularConstant;
+
+  return vec4<f32>(radiance, 1.0);
 }

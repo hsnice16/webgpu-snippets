@@ -132,6 +132,26 @@ export function VercelLogoCanvas() {
           stepMode: "vertex" as GPUVertexStepMode,
         };
 
+        ////////////////*********** Uniform Buffers ***********////////////////
+
+        const lightDirection = new Float32Array([-1.0, -1.0, -1.0]);
+
+        const lightDirectionBuffer = device.createBuffer({
+          label: "Light Direction Buffer Descriptor",
+          size: lightDirection.byteLength,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
+        device.queue.writeBuffer(lightDirectionBuffer, 0, lightDirection);
+
+        const viewDirection = new Float32Array([-1.0, -1.0, -1.0]);
+
+        const viewDirectionBuffer = device.createBuffer({
+          label: "View Direction Buffer Descriptor",
+          size: viewDirection.byteLength,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
         ////////////////*********** Model View Matrix ***********////////////////
 
         const modelViewMatrix = mat4.lookAt(
@@ -139,6 +159,30 @@ export function VercelLogoCanvas() {
           vec3.fromValues(1, -1, 1),
           vec3.fromValues(0, 0, 0),
           vec3.fromValues(0.0, 1.0, 0.0)
+        );
+
+        ////////////////*********** Normal Matrix ***********////////////////
+
+        const modelViewMatrixInverse = mat4.invert(
+          mat4.create(),
+          modelViewMatrix
+        );
+
+        const normalMatrix = mat4.transpose(
+          mat4.create(),
+          modelViewMatrixInverse!
+        );
+
+        const normalMatrixBuffer = device.createBuffer({
+          label: "Normal Matirx Buffer Descriptor",
+          size: normalMatrix.length * 4, // 16 floats * 4 bytes
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
+        device.queue.writeBuffer(
+          normalMatrixBuffer,
+          0,
+          new Float32Array(normalMatrix)
         );
 
         ////////////////*********** Projection Matrix ***********////////////////
@@ -179,6 +223,21 @@ export function VercelLogoCanvas() {
               visibility: GPUShaderStage.VERTEX,
               buffer: {},
             },
+            {
+              binding: 1,
+              visibility: GPUShaderStage.VERTEX,
+              buffer: {},
+            },
+            {
+              binding: 2,
+              visibility: GPUShaderStage.VERTEX,
+              buffer: {},
+            },
+            {
+              binding: 3,
+              visibility: GPUShaderStage.VERTEX,
+              buffer: {},
+            },
           ],
         });
 
@@ -191,6 +250,18 @@ export function VercelLogoCanvas() {
             {
               binding: 0,
               resource: { buffer: modelViewProjectionMatrixBuffer },
+            },
+            {
+              binding: 1,
+              resource: { buffer: normalMatrixBuffer },
+            },
+            {
+              binding: 2,
+              resource: { buffer: lightDirectionBuffer },
+            },
+            {
+              binding: 3,
+              resource: { buffer: viewDirectionBuffer },
             },
           ],
         });
