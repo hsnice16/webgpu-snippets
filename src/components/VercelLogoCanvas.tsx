@@ -3,9 +3,10 @@
 import { mat4, vec3 } from "gl-matrix";
 import { useEffect, useRef, useState } from "react";
 
+import { useIsMobile } from "@/hooks";
 import { checkWebGPUSupport } from "@/utils";
 import {
-  createIndexBuffer,
+  faceNormal,
   createVertexBuffer,
   createUniformBuffer,
   createVertexBufferLayoutDesc,
@@ -16,8 +17,9 @@ import code from "./shaders/vercel-logo-shaders.wgsl";
 const SAMPLE_COUNT = 4;
 
 export function VercelLogoCanvas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isMobile = useIsMobile();
   const [message, setMessage] = useState("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     (async function () {
@@ -54,21 +56,59 @@ export function VercelLogoCanvas() {
 
         ////////////////*********** Buffers ***********////////////////
 
+        // 4 side faces (pyramid). We duplicate verts per face so each face can have flat normal.
+        // Face vertices
+        const P0 = [0.0, 0.75, 0.0]; // top
+        const P1 = [0.5, -0.75, 0.5]; // front-right
+        const P2 = [-0.5, -0.75, 0.5]; // front-left
+        const P3 = [0.5, -0.75, -0.5]; // back-right
+        const P4 = [-0.5, -0.75, -0.5]; // back-left
+
+        // Triangles (per face):
+        // F_front:  (P0, P1, P2)
+        // F_right:  (P0, P3, P1)
+        // F_left:   (P0, P2, P4)
+        // F_back:   (P0, P4, P3)
+
+        const F_front = [P0, P1, P2];
+        const F_right = [P0, P3, P1];
+        const F_left = [P0, P2, P4];
+        const F_back = [P0, P4, P3];
+
+        const N_front = faceNormal(
+          ...(F_front as unknown as [number[], number[], number[]])
+        );
+        const N_right = faceNormal(
+          ...(F_right as unknown as [number[], number[], number[]])
+        );
+        const N_left = faceNormal(
+          ...(F_left as unknown as [number[], number[], number[]])
+        );
+        const N_back = faceNormal(
+          ...(F_back as unknown as [number[], number[], number[]])
+        );
+
+        // Pre-vertex positions (duplicated per face)
         const positions = new Float32Array([
-          // 0: top
-          0.0, 0.75, 0.0,
+          // front face
+          ...F_front[0],
+          ...F_front[1],
+          ...F_front[2],
 
-          // 1: front-right (front + right)
-          0.5, -0.75, 0.5,
+          // right face
+          ...F_right[0],
+          ...F_right[1],
+          ...F_right[2],
 
-          // 2: front-left (front + left)
-          -0.5, -0.75, 0.5,
+          // left face
+          ...F_left[0],
+          ...F_left[1],
+          ...F_left[2],
 
-          // 3: back-right (right + back)
-          0.5, -0.75, -0.5,
-
-          // 4: back-left (left + back)
-          -0.5, -0.75, -0.5,
+          // back face
+          ...F_back[0],
+          ...F_back[1],
+          ...F_back[2],
         ]);
 
         const positionBuffer = createVertexBuffer(
@@ -84,31 +124,23 @@ export function VercelLogoCanvas() {
           bufferLayoutDescLabel: "Position Buffer Layout Descriptor",
         });
 
-        const indices = new Uint16Array([0, 1, 2, 0, 3, 1, 0, 2, 4, 0, 4, 3]);
-
-        const indexBuffer = createIndexBuffer(
-          device,
-          indices.byteLength,
-          "Index Buffer"
-        );
-
-        device.queue.writeBuffer(indexBuffer, 0, indices);
-
+        // Flat normals per face (same normal repeated 3 times)
         const normals = new Float32Array([
-          // 0: top (average of 4 faces)
-          0.0, -1.0, 0.0,
-
-          // 1: front-right (front + right, normalized)
-          -0.5773503, -0.5773503, -0.5773503,
-
-          // 2: front-left (front + left)
-          0.5773503, -0.5773503, -0.5773503,
-
-          // 3: back-right (right + back)
-          -0.5773503, -0.5773503, 0.5773503,
-
-          // 4: back-left (left + back)
-          0.5773503, -0.5773503, 0.5773503,
+          ...N_front,
+          ...N_front,
+          ...N_front,
+          //
+          ...N_right,
+          ...N_right,
+          ...N_right,
+          //
+          ...N_left,
+          ...N_left,
+          ...N_left,
+          //
+          ...N_back,
+          ...N_back,
+          ...N_back,
         ]);
 
         const normalBuffer = createVertexBuffer(
@@ -349,8 +381,9 @@ export function VercelLogoCanvas() {
         renderPass.setVertexBuffer(0, positionBuffer);
         renderPass.setVertexBuffer(1, normalBuffer);
         renderPass.setBindGroup(0, bindGroup);
-        renderPass.setIndexBuffer(indexBuffer, "uint16");
-        renderPass.drawIndexed(indices.length);
+
+        const vertexCount = 4 /*faces*/ * 3; /*verts per face*/ // = 12
+        renderPass.draw(vertexCount);
 
         renderPass.end();
         device.queue.submit([commandEncoder.finish()]);
@@ -359,18 +392,26 @@ export function VercelLogoCanvas() {
   }, []);
 
   return (
-    <section className="flex items-center justify-center bg-black min-h-screen w-full">
-      <div className="text-white flex-1 flex flex-col gap-4 items-center justify-start text-left h-[250]">
-        <h2 className="text-5xl font-geist-mono w-[500]">Vercel</h2>
-        <p className="text-2xl font-geist-sans w-[500]">
-          Build and deploy on the AI Cloud.
-        </p>
+    <section className="flex items-center justify-center flex-col sm:flex-row bg-black min-h-screen w-full">
+      <div className="text-white sm:flex-1 flex flex-col items-center justify-center gap-4">
+        <div className="max-w-[500] m-auto sm:h-[250]">
+          <h2 className="text-xl sm:text-5xl font-geist-mono">Vercel</h2>
+
+          <p className="text-lg sm:text-2xl font-geist-sans">
+            Build and deploy on the AI Cloud.
+          </p>
+        </div>
       </div>
-      <div className="text-white flex-1 flex items-center justify-center">
+
+      <div className="text-white sm:flex-1 flex items-center justify-center">
         {message ? (
           <h4 className="font-geist-sans">{message}</h4>
         ) : (
-          <canvas ref={canvasRef} width={550} height={550} />
+          <canvas
+            ref={canvasRef}
+            width={isMobile ? 250 : 550}
+            height={isMobile ? 250 : 550}
+          />
         )}
       </div>
     </section>
