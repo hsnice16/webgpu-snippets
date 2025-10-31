@@ -38,7 +38,7 @@ export function VercelLogoCanvas() {
       if (canvasRef.current) {
         const context = canvasRef.current.getContext("webgpu");
         if (!context) {
-          setMessage("Failed to get the canvas `wegbgpu` context!!");
+          setMessage("Failed to get the canvas `webgpu` context!!");
           return;
         }
 
@@ -127,7 +127,7 @@ export function VercelLogoCanvas() {
 
         ////////////////*********** Uniform Buffers ***********////////////////
 
-        const lightDirection = new Float32Array([-1.0, -1.0, -1.0]);
+        const lightDirection = new Float32Array([0.25, 0.25, -4.0]);
 
         const lightDirectionBuffer = createUniformBuffer(
           device,
@@ -137,13 +137,15 @@ export function VercelLogoCanvas() {
 
         device.queue.writeBuffer(lightDirectionBuffer, 0, lightDirection);
 
-        const viewDirection = new Float32Array([-1.0, -1.0, -1.0]);
+        const viewDirection = new Float32Array([0.25, 0.25, -4.0]);
 
         const viewDirectionBuffer = createUniformBuffer(
           device,
           viewDirection.byteLength,
           "View Direction Buffer Descriptor"
         );
+
+        device.queue.writeBuffer(viewDirectionBuffer, 0, viewDirection);
 
         ////////////////*********** Model View Matrix ***********////////////////
 
