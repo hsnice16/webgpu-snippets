@@ -1,10 +1,11 @@
 "use client";
 
 import { mat4, vec3 } from "gl-matrix";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
 import { useIsMobile } from "@/hooks";
 import { checkWebGPUSupport } from "@/utils";
+import { ROTATION_SPEED, SAMPLE_COUNT } from "@/constants";
 import {
   faceNormal,
   createVertexBuffer,
@@ -14,12 +15,14 @@ import {
 
 import code from "./shaders/vercel-logo-shaders.wgsl";
 
-const SAMPLE_COUNT = 4;
-
 export function VercelLogoCanvas() {
   const isMobile = useIsMobile();
   const [message, setMessage] = useState("");
+
+  const angleRef = useRef(0);
+  const rafRef = useRef<number>(undefined);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const lastTimestampRef = useRef<number>(undefined);
 
   useEffect(() => {
     (async function () {
@@ -181,14 +184,46 @@ export function VercelLogoCanvas() {
 
         ////////////////*********** Model View Matrix ***********////////////////
 
-        const modelViewMatrix = mat4.lookAt(
+        const modelMatrix = mat4.create();
+
+        const modelMatrixBuffer = createUniformBuffer(
+          device,
+          modelMatrix.length * 4, // 16 floats * 4 bytes
+          "Model Matrix Buffer Descriptor"
+        );
+
+        device.queue.writeBuffer(
+          modelMatrixBuffer,
+          0,
+          new Float32Array(modelMatrix)
+        );
+
+        const viewMatrix = mat4.lookAt(
           mat4.create(),
           vec3.fromValues(1, -1, 1),
           vec3.fromValues(0, 0, 0),
           vec3.fromValues(0.0, 1.0, 0.0)
         );
 
+        const viewMatrixBuffer = createUniformBuffer(
+          device,
+          viewMatrix.length * 4, // 16 floats * 4 bytes
+          "View Matrix Buffer Descriptor"
+        );
+
+        device.queue.writeBuffer(
+          viewMatrixBuffer,
+          0,
+          new Float32Array(viewMatrix)
+        );
+
         ////////////////*********** Normal Matrix ***********////////////////
+
+        const modelViewMatrix = mat4.multiply(
+          mat4.create(),
+          viewMatrix,
+          modelMatrix
+        );
 
         const modelViewMatrixInverse = mat4.invert(
           mat4.create(),
@@ -222,22 +257,16 @@ export function VercelLogoCanvas() {
           1000.0
         );
 
-        const modelViewProjectionMatrix = mat4.multiply(
-          mat4.create(),
-          projectionMatrix,
-          modelViewMatrix
-        );
-
-        const modelViewProjectionMatrixBuffer = createUniformBuffer(
+        const projectionMatrixBuffer = createUniformBuffer(
           device,
-          modelViewProjectionMatrix.length * 4, // 16 floats * 4 bytes
-          "Model View Projection Matrix Buffer Descriptor"
+          projectionMatrix.length * 4, // 16 floats * 4 bytes
+          "Projection Matrix Buffer Descriptor"
         );
 
         device.queue.writeBuffer(
-          modelViewProjectionMatrixBuffer,
+          projectionMatrixBuffer,
           0,
-          new Float32Array(modelViewProjectionMatrix)
+          new Float32Array(projectionMatrix)
         );
 
         ////////////////*********** Bind Group Layout ***********////////////////
@@ -265,6 +294,16 @@ export function VercelLogoCanvas() {
               visibility: GPUShaderStage.VERTEX,
               buffer: {},
             },
+            {
+              binding: 4,
+              visibility: GPUShaderStage.VERTEX,
+              buffer: {},
+            },
+            {
+              binding: 5,
+              visibility: GPUShaderStage.VERTEX,
+              buffer: {},
+            },
           ],
         });
 
@@ -276,18 +315,26 @@ export function VercelLogoCanvas() {
           entries: [
             {
               binding: 0,
-              resource: { buffer: modelViewProjectionMatrixBuffer },
+              resource: { buffer: modelMatrixBuffer },
             },
             {
               binding: 1,
-              resource: { buffer: normalMatrixBuffer },
+              resource: { buffer: viewMatrixBuffer },
             },
             {
               binding: 2,
-              resource: { buffer: lightDirectionBuffer },
+              resource: { buffer: projectionMatrixBuffer },
             },
             {
               binding: 3,
+              resource: { buffer: normalMatrixBuffer },
+            },
+            {
+              binding: 4,
+              resource: { buffer: lightDirectionBuffer },
+            },
+            {
+              binding: 5,
               resource: { buffer: viewDirectionBuffer },
             },
           ],
@@ -353,41 +400,103 @@ export function VercelLogoCanvas() {
           size: [canvasRef.current.width, canvasRef.current.height, 1],
         });
 
-        ////////////////*********** Encoders ***********////////////////
+        ////////////////*********** Draw Function ***********////////////////
 
-        const commandEncoder = device.createCommandEncoder();
-        const renderPass = commandEncoder.beginRenderPass({
-          colorAttachments: [
-            {
-              loadOp: "clear",
-              storeOp: "store",
-              view: msaaTexture.createView(),
-              clearValue: { r: 0, g: 0, b: 0, a: 1 },
-              resolveTarget: context.getCurrentTexture().createView(),
+        const draw = (timestampInSec: number) => {
+          angleRef.current += ROTATION_SPEED * timestampInSec;
+
+          // Update model and normal matrix
+          const modelMatrix = mat4.create();
+          mat4.rotateY(modelMatrix, modelMatrix, angleRef.current);
+
+          const modelViewMatrix = mat4.multiply(
+            mat4.create(),
+            viewMatrix,
+            modelMatrix
+          );
+
+          const modelViewMatrixInverse = mat4.invert(
+            mat4.create(),
+            modelViewMatrix
+          );
+
+          const normalMatrix = mat4.transpose(
+            mat4.create(),
+            modelViewMatrixInverse!
+          );
+
+          // Upload uniforms
+          device.queue.writeBuffer(
+            modelMatrixBuffer,
+            0,
+            new Float32Array(modelMatrix)
+          );
+          device.queue.writeBuffer(
+            normalMatrixBuffer,
+            0,
+            new Float32Array(normalMatrix)
+          );
+
+          ////////////////*********** Encoders ***********////////////////
+
+          const commandEncoder = device.createCommandEncoder();
+          const renderPass = commandEncoder.beginRenderPass({
+            colorAttachments: [
+              {
+                loadOp: "clear",
+                storeOp: "store",
+                view: msaaTexture.createView(),
+                clearValue: { r: 0, g: 0, b: 0, a: 1 },
+                resolveTarget: context.getCurrentTexture().createView(),
+              },
+            ],
+            depthStencilAttachment: {
+              depthClearValue: 1,
+              depthLoadOp: "clear",
+              depthStoreOp: "store",
+              stencilClearValue: 0,
+              stencilLoadOp: "clear",
+              stencilStoreOp: "store",
+              view: depthTexture.createView(),
             },
-          ],
-          depthStencilAttachment: {
-            depthClearValue: 1,
-            depthLoadOp: "clear",
-            depthStoreOp: "store",
-            stencilClearValue: 0,
-            stencilLoadOp: "clear",
-            stencilStoreOp: "store",
-            view: depthTexture.createView(),
-          },
-        });
+          });
 
-        renderPass.setPipeline(pipeline);
-        renderPass.setVertexBuffer(0, positionBuffer);
-        renderPass.setVertexBuffer(1, normalBuffer);
-        renderPass.setBindGroup(0, bindGroup);
+          renderPass.setPipeline(pipeline);
+          renderPass.setVertexBuffer(0, positionBuffer);
+          renderPass.setVertexBuffer(1, normalBuffer);
+          renderPass.setBindGroup(0, bindGroup);
 
-        const vertexCount = 4 /*faces*/ * 3; /*verts per face*/ // = 12
-        renderPass.draw(vertexCount);
+          const vertexCount = 4 /*faces*/ * 3; /*verts per face*/ // = 12
+          renderPass.draw(vertexCount);
 
-        renderPass.end();
-        device.queue.submit([commandEncoder.finish()]);
+          renderPass.end();
+          device.queue.submit([commandEncoder.finish()]);
+        };
+
+        ////////////////*********** Loop Function ***********////////////////
+
+        const loop = (timestamp: number) => {
+          // Timestamp in seconds
+          const lastTimestamp = lastTimestampRef.current ?? timestamp;
+          const timestampInSec = Math.min(
+            (timestamp - lastTimestamp) / 1000,
+            0.1
+          );
+
+          lastTimestampRef.current = timestamp;
+
+          draw(timestampInSec);
+          rafRef.current = requestAnimationFrame(loop);
+        };
+
+        rafRef.current = requestAnimationFrame(loop);
       }
+
+      return () => {
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
+        }
+      };
     })();
   }, []);
 

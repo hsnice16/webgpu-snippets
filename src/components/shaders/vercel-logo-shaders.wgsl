@@ -1,13 +1,19 @@
 @group(0) @binding(0)
-var<uniform> modelViewProjectionMatrix: mat4x4<f32>;
+var<uniform> modelMatrix: mat4x4<f32>;
 
 @group(0) @binding(1)
-var<uniform> normalMatrix: mat4x4<f32>;
+var<uniform> viewMatrix: mat4x4<f32>;
 
 @group(0) @binding(2)
-var<uniform> lightDirection: vec3<f32>;
+var<uniform> projectionMatrix: mat4x4<f32>;
 
 @group(0) @binding(3)
+var<uniform> normalMatrix: mat4x4<f32>;
+
+@group(0) @binding(4)
+var<uniform> lightDirection: vec3<f32>;
+
+@group(0) @binding(5)
 var<uniform> viewDirection: vec3<f32>;
 
 const ambientColor: vec4<f32> = vec4<f32>(0.85, 0.85, 0.85, 1.0);
@@ -51,7 +57,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
   out.viewDir = normalize((normalMatrix * vec4<f32>(-viewDirection, 0.0)).xyz);
   out.lightDir = normalize((normalMatrix * vec4<f32>(-lightDirection, 0.0)).xyz);
 
-  out.clip_position = modelViewProjectionMatrix * pos;
+  out.clip_position = projectionMatrix * viewMatrix * modelMatrix * pos;
   return out;
 }
 
