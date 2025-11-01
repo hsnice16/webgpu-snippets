@@ -54,8 +54,8 @@ fn vs_main(in: VertexInput) -> VertexOutput {
   var out: VertexOutput;
 
   out.normal = normalize((normalMatrix * vec4<f32>(in.nrm, 0.0)).xyz);
-  out.viewDir = normalize((normalMatrix * vec4<f32>(-viewDirection, 0.0)).xyz);
-  out.lightDir = normalize((normalMatrix * vec4<f32>(-lightDirection, 0.0)).xyz);
+  out.viewDir = normalize((vec4<f32>(-viewDirection, 0.0)).xyz);
+  out.lightDir = normalize((vec4<f32>(-lightDirection, 0.0)).xyz);
 
   out.clip_position = projectionMatrix * viewMatrix * modelMatrix * pos;
   return out;

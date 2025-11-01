@@ -162,7 +162,7 @@ export function VercelLogoCanvas() {
 
         ////////////////*********** Uniform Buffers ***********////////////////
 
-        const lightDirection = new Float32Array([0.25, 0.25, -4.0]);
+        const lightDirection = new Float32Array([0, 0, -1.0]);
 
         const lightDirectionBuffer = createUniformBuffer(
           device,
@@ -172,7 +172,7 @@ export function VercelLogoCanvas() {
 
         device.queue.writeBuffer(lightDirectionBuffer, 0, lightDirection);
 
-        const viewDirection = new Float32Array([0.25, 0.25, -4.0]);
+        const viewDirection = new Float32Array([0, 0, -1.0]);
 
         const viewDirectionBuffer = createUniformBuffer(
           device,
