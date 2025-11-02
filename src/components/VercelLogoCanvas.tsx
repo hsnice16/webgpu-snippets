@@ -1,11 +1,19 @@
 "use client";
 
 import { mat4, vec3 } from "gl-matrix";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, MouseEventHandler } from "react";
 
 import { useIsMobile } from "@/hooks";
 import { checkWebGPUSupport } from "@/utils";
-import { ROTATION_SPEED, SAMPLE_COUNT } from "@/constants";
+
+import {
+  MAX_OFFSET,
+  RETURN_SPEED,
+  SAMPLE_COUNT,
+  RETURN_IDLE_MS,
+  ROTATION_SPEED,
+} from "@/constants";
+
 import {
   faceNormal,
   createVertexBuffer,
@@ -20,6 +28,10 @@ export function VercelLogoCanvas() {
   const [message, setMessage] = useState("");
 
   const angleRef = useRef(0);
+  const translateX = useRef(0);
+  const translateY = useRef(0);
+  const lastMouseMoveAtRef = useRef(0);
+
   const rafRef = useRef<number>(undefined);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastTimestampRef = useRef<number>(undefined);
@@ -407,6 +419,11 @@ export function VercelLogoCanvas() {
 
           // Update model and normal matrix
           const modelMatrix = mat4.create();
+          mat4.translate(
+            modelMatrix,
+            modelMatrix,
+            vec3.fromValues(translateX.current, translateY.current, 0)
+          );
           mat4.rotateY(modelMatrix, modelMatrix, angleRef.current);
 
           const modelViewMatrix = mat4.multiply(
@@ -483,6 +500,15 @@ export function VercelLogoCanvas() {
             0.1
           );
 
+          // Smooth return to center after inactivity
+          const now = performance.now();
+          if (now - (lastMouseMoveAtRef.current || 0) > RETURN_IDLE_MS) {
+            const t = Math.min(1, RETURN_SPEED * timestampInSec);
+
+            translateX.current += (0 - translateX.current) * t;
+            translateY.current += (0 - translateY.current) * t;
+          }
+
           lastTimestampRef.current = timestamp;
 
           draw(timestampInSec);
@@ -500,28 +526,72 @@ export function VercelLogoCanvas() {
     })();
   }, []);
 
+  const handleMouseMove: MouseEventHandler<HTMLCanvasElement> = (event) => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      translateX.current = 0;
+      translateY.current = 0;
+      return;
+    }
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    const clientRect = canvas.getBoundingClientRect();
+
+    const mouseX = event.clientX - clientRect.left;
+    const mouseY = event.clientY - clientRect.top;
+
+    // Normalize to [-1, 1]
+    let localTranslateX = (mouseX - centerX) / centerX;
+    let localTranslateY = (mouseY - centerY) / centerY;
+
+    // screen Y grows down; flip so up is positive
+    localTranslateY = -localTranslateY;
+
+    localTranslateX = Math.max(-1, Math.min(1, localTranslateX)) * MAX_OFFSET;
+    localTranslateY = Math.max(-1, Math.min(1, localTranslateY)) * MAX_OFFSET;
+
+    localTranslateY = Number(localTranslateY.toFixed(4));
+    localTranslateX = Number(localTranslateX.toFixed(4));
+
+    translateX.current = localTranslateX;
+    translateY.current = localTranslateY;
+
+    lastMouseMoveAtRef.current = performance.now();
+  };
+
+  const handleMouseLeave = () => {
+    translateX.current = 0;
+    translateY.current = 0;
+  };
+
   return (
-    <section className="flex items-center justify-center flex-col sm:flex-row bg-black min-h-screen w-full">
-      <div className="text-white sm:flex-1 flex flex-col items-center justify-center gap-4">
-        <div className="max-w-[500] m-auto sm:h-[250]">
-          <h2 className="text-xl sm:text-5xl font-geist-mono">Vercel</h2>
+    <section className="bg-black min-h-screen w-full pt-20 sm:pt-0">
+      <div className="flex items-center justify-center flex-col sm:flex-row w-full">
+        <div className="text-white sm:flex-1 flex flex-col items-center justify-center gap-4">
+          <div className="max-w-[500] m-auto sm:h-[250]">
+            <h2 className="text-xl sm:text-5xl font-geist-mono">Vercel</h2>
 
-          <p className="text-lg sm:text-2xl font-geist-sans">
-            Build and deploy on the AI Cloud.
-          </p>
+            <p className="text-lg sm:text-2xl font-geist-sans">
+              Build and deploy on the AI Cloud.
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="text-white sm:flex-1 flex items-center justify-center">
-        {message ? (
-          <h4 className="font-geist-sans">{message}</h4>
-        ) : (
-          <canvas
-            ref={canvasRef}
-            width={isMobile ? 250 : 550}
-            height={isMobile ? 250 : 550}
-          />
-        )}
+        <div className="text-white sm:flex-1 flex items-center justify-center">
+          {message ? (
+            <h4 className="font-geist-sans">{message}</h4>
+          ) : (
+            <canvas
+              ref={canvasRef}
+              width={isMobile ? 420 : 840}
+              height={isMobile ? 420 : 840}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+            />
+          )}
+        </div>
       </div>
     </section>
   );
