@@ -4,8 +4,6 @@ import { mat4, vec3 } from "gl-matrix";
 import { useRef, useState, useEffect, MouseEventHandler } from "react";
 
 import { useIsMobile } from "@/hooks";
-import { checkWebGPUSupport } from "@/utils";
-
 import {
   MAX_OFFSET,
   RETURN_SPEED,
@@ -14,14 +12,19 @@ import {
   ROTATION_SPEED,
 } from "@/constants";
 
+import { checkWebGPUSupport } from "@/utils";
+import { faceNormal } from "@/utils/faceNormal";
+
 import {
-  faceNormal,
+  getDevice,
+  getAdapter,
+  configureContext,
   createVertexBuffer,
   createUniformBuffer,
   createVertexBufferLayoutDesc,
-} from "@/utils/misc";
+} from "@/utils/webgpu";
 
-import code from "./shaders/vercel-logo-shaders.wgsl";
+import code from "./shaders/vercel-logo-shader.wgsl";
 
 export function VercelLogoCanvas() {
   const isMobile = useIsMobile();
@@ -44,30 +47,29 @@ export function VercelLogoCanvas() {
         return;
       }
 
-      const adapter = await navigator.gpu.requestAdapter();
+      const adapter = await getAdapter();
       if (!adapter) {
         setMessage("Failed to get any GPUAdapter!!");
         return;
       }
 
-      const device = await adapter.requestDevice();
+      const device = await getDevice(adapter);
 
       if (canvasRef.current) {
-        const context = canvasRef.current.getContext("webgpu");
-        if (!context) {
-          setMessage("Failed to get the canvas `webgpu` context!!");
-          return;
-        }
-
         const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
 
         ////////////////*********** Context Configure ***********////////////////
 
-        context.configure({
+        const context = configureContext(
           device,
-          alphaMode: "opaque",
-          format: canvasFormat,
-        });
+          canvasRef.current,
+          canvasFormat
+        );
+
+        if (!context) {
+          setMessage("Failed to get the canvas `webgpu` context!!");
+          return;
+        }
 
         ////////////////*********** Buffers ***********////////////////
 
@@ -372,11 +374,7 @@ export function VercelLogoCanvas() {
           fragment: {
             module: device.createShaderModule({ code }),
             entryPoint: "fs_main",
-            targets: [
-              {
-                format: canvasFormat,
-              },
-            ],
+            targets: [{ format: canvasFormat }],
           },
           primitive: {
             cullMode: "back",
