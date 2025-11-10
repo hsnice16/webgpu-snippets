@@ -2,7 +2,12 @@
 
 @theme inline {
   --breakpoint-sm: 760px;
+  --cursor-pen: url("/pen.svg"), auto;
 
   --font-geist-mono: var(--font-geist-mono);
   --font-geist-sans: var(--font-geist-sans);
+}
+
+html {
+  scroll-behavior: smooth;
 }

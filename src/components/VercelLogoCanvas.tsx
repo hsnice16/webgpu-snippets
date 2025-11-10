@@ -25,6 +25,7 @@ import {
 } from "@/utils/webgpu";
 
 import code from "./shaders/vercel-logo-shader.wgsl";
+import { AnimatedDownArrow } from "./ui";
 
 export function VercelLogoCanvas() {
   const isMobile = useIsMobile();
@@ -565,7 +566,7 @@ export function VercelLogoCanvas() {
   };
 
   return (
-    <section className="bg-black min-h-screen w-full pt-20 sm:pt-0">
+    <section className="bg-black min-h-screen w-full pt-20 sm:pt-0 relative">
       <div className="flex items-center justify-center flex-col sm:flex-row w-full">
         <div className="text-white sm:flex-1 flex flex-col items-center justify-center gap-4">
           <div className="max-w-[500] m-auto sm:h-[250]">
@@ -587,10 +588,14 @@ export function VercelLogoCanvas() {
               height={isMobile ? 420 : 840}
               onMouseMove={handleMouseMove}
               onMouseLeave={handleMouseLeave}
+              onPointerMove={handleMouseMove}
+              onPointerLeave={handleMouseLeave}
             />
           )}
         </div>
       </div>
+
+      <AnimatedDownArrow />
     </section>
   );
 }

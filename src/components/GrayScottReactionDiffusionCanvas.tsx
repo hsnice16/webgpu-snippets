@@ -19,10 +19,10 @@ import renderCode from "./shaders/gray-scott-diffusion-render-shader.wgsl";
 export function GrayScottReactionDiffusionCanvas() {
   const [message, setMessage] = useState("");
   const [isDragging, setIsDragging] = useState(false);
-  const drawPositionRef = useRef(new Float32Array(3));
 
   const rafRef = useRef<number>(undefined);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawPositionRef = useRef(new Float32Array(3));
 
   useEffect(() => {
     let drawCancelled = false;
@@ -424,13 +424,16 @@ export function GrayScottReactionDiffusionCanvas() {
   };
 
   return (
-    <section className="bg-white min-h-screen w-full flex items-center justify-center relative">
+    <section
+      id="gray-scott-diffusion"
+      className="bg-white min-h-screen w-full flex items-center justify-center relative"
+    >
       <p className="absolute bg-black text-white text-sm top-4 left-[4vw] px-2 py-1 rounded font-geist-mono">
         Gray-Scott Reaction Diffusion System
       </p>
+
       <p className="absolute bg-black text-white text-sm top-12 left-[4vw] px-2 py-1 rounded font-geist-mono">
-        Click & drag your mouse, then leave it to{" "}
-        <br className="block sm:hidden" /> see the pattern
+        Click & drag the pen to see the pattern
       </p>
 
       <div className="w-[92vw] h-[82vh]">
@@ -445,7 +448,7 @@ export function GrayScottReactionDiffusionCanvas() {
             onMouseMove={handleMouseMove}
             onPointerDown={handleMouseDown}
             onPointerMove={handleMouseMove}
-            className="w-full h-full border"
+            className="w-full h-full border cursor-pen"
           ></canvas>
         )}
       </div>
