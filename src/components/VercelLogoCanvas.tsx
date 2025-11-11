@@ -600,18 +600,20 @@ export function VercelLogoCanvas() {
 
   return (
     <section className="bg-black min-h-dvh w-full relative">
-      <div className="flex items-center justify-center flex-col sm:flex-row min-h-dvh sm:min-h-auto">
-        <div className="sm:flex-1">
-          <div className="text-white max-w-[500] m-auto sm:h-[340]">
-            <h2 className="text-xl sm:text-5xl font-geist-mono">Vercel</h2>
+      <div className="flex items-center justify-center flex-col lg:flex-row min-h-dvh lg:min-h-auto">
+        <div className="lg:flex-1">
+          <div className="text-white max-w-[500] m-auto lg:h-[340]">
+            <h2 className="text-xl sm:text-3xl lg:text-5xl font-geist-mono">
+              Vercel
+            </h2>
 
-            <p className="text-lg sm:text-2xl font-geist-sans">
+            <p className="text-lg sm:text-xl lg:text-2xl font-geist-sans">
               Build and deploy on the AI Cloud.
             </p>
           </div>
         </div>
 
-        <div className="text-white sm:flex-1 flex items-center justify-center">
+        <div className="text-white lg:flex-1 flex items-center justify-center">
           {message ? (
             <h4 className="font-geist-sans">{message}</h4>
           ) : (
