@@ -46,7 +46,9 @@ export function GrayScottReactionDiffusionCanvas() {
         const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
         resizeCanvasForWebGPU(canvasRef.current);
 
-        ////////////////*********** Context Configure ***********////////////////
+        /**
+         * Context Configure
+         */
 
         const context = configureContext(
           device,
@@ -59,7 +61,9 @@ export function GrayScottReactionDiffusionCanvas() {
           return;
         }
 
-        ////////////////*********** Buffers ***********////////////////
+        /**
+         * Vertex Buffer & Uniform Buffer
+         */
 
         const positions = new Float32Array([
           1.0, 1.0, 1.0, 0.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 0.0, 0.0, -1.0,
@@ -81,15 +85,15 @@ export function GrayScottReactionDiffusionCanvas() {
           bufferLayoutDescLabel: "Diffusion Position Buffer Layout Descriptor",
         });
 
-        ////////////////*********** Uniform Buffers ***********////////////////
-
         const drawPositionBuffer = createUniformBuffer(
           device,
           drawPositionRef.current.byteLength,
           "Diffusion Draw Position Buffer Descriptor"
         );
 
-        ////////////////*********** Textures ***********////////////////
+        /**
+         * Textures
+         */
 
         const srcTexture = device.createTexture({
           label: "Diffusion Src Texture Descriptor",
@@ -148,7 +152,9 @@ export function GrayScottReactionDiffusionCanvas() {
             GPUTextureUsage.TEXTURE_BINDING,
         });
 
-        ////////////////*********** Sampler ***********////////////////
+        /**
+         * Sampler
+         */
 
         const sampler = device.createSampler({
           label: "Diffusion Sampler Descriptor",
@@ -160,7 +166,9 @@ export function GrayScottReactionDiffusionCanvas() {
           addressModeW: "clamp-to-edge",
         });
 
-        ////////////////*********** Bind Group Layout ***********////////////////
+        /**
+         * Bind Group Layouts
+         */
 
         const bindGroupLayout = device.createBindGroupLayout({
           label: "Diffusion Bind Group Layout Descriptor",
@@ -203,7 +211,9 @@ export function GrayScottReactionDiffusionCanvas() {
           ],
         });
 
-        ////////////////*********** Bind Group ***********////////////////
+        /**
+         * Bind Groups
+         */
 
         const bindGroup0 = device.createBindGroup({
           label: "Diffusion Bind Group 0 Descriptor",
@@ -273,7 +283,9 @@ export function GrayScottReactionDiffusionCanvas() {
           ],
         });
 
-        ////////////////*********** Pipeline Layout ***********////////////////
+        /**
+         * Pipeline Layouts & Pipelines
+         */
 
         const pipelineLayout = device.createPipelineLayout({
           label: "Diffusion Pipeline Layout Descriptor",
@@ -284,8 +296,6 @@ export function GrayScottReactionDiffusionCanvas() {
           label: "Diffusion Compute Pipeline Layout Descriptor",
           bindGroupLayouts: [computeBindGroupLayout],
         });
-
-        ////////////////*********** Pipeline ***********////////////////
 
         const pipeline = device.createRenderPipeline({
           label: "Diffusion Render Pipeline Descriptor",
@@ -316,7 +326,9 @@ export function GrayScottReactionDiffusionCanvas() {
           },
         });
 
-        ////////////////*********** Draw Function ***********////////////////
+        /**
+         * Draw Function
+         */
 
         let frame = 0;
 
@@ -331,7 +343,9 @@ export function GrayScottReactionDiffusionCanvas() {
             drawPositionRef.current
           );
 
-          ////////////////*********** Encoders ***********////////////////
+          /**
+           * Encoders
+           */
 
           const commandEncoder = device.createCommandEncoder();
 
@@ -389,6 +403,10 @@ export function GrayScottReactionDiffusionCanvas() {
     };
   }, []);
 
+  /**
+   * Handlers
+   */
+
   const handleMouseMove: MouseEventHandler<HTMLCanvasElement> = (event) => {
     if (isDragging) {
       const canvas = canvasRef.current;
@@ -422,6 +440,10 @@ export function GrayScottReactionDiffusionCanvas() {
     setIsDragging(false);
     drawPositionRef.current.set([0.0, 0.0, 0.0], 0);
   };
+
+  /**
+   * Return
+   */
 
   return (
     <section

@@ -12,8 +12,7 @@ import {
   ROTATION_SPEED,
 } from "@/constants";
 
-import { checkWebGPUSupport } from "@/utils";
-import { faceNormal } from "@/utils/faceNormal";
+import { checkWebGPUSupport, getVercelLogoCanvasPositionSides } from "@/utils";
 
 import {
   getDevice,
@@ -39,8 +38,12 @@ export function VercelLogoCanvas() {
   const rafRef = useRef<number>(undefined);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastTimestampRef = useRef<number>(undefined);
+  const timeoutRef = useRef<NodeJS.Timeout>(undefined);
+  const resizeObserverRef = useRef<ResizeObserver>(undefined);
 
   useEffect(() => {
+    let drawCancelled = false;
+
     (async function () {
       const isWebGPUSupported = checkWebGPUSupport();
       if (!isWebGPUSupported) {
@@ -58,9 +61,6 @@ export function VercelLogoCanvas() {
 
       if (canvasRef.current) {
         const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
-
-        ////////////////*********** Context Configure ***********////////////////
-
         const context = configureContext(
           device,
           canvasRef.current,
@@ -72,39 +72,20 @@ export function VercelLogoCanvas() {
           return;
         }
 
-        ////////////////*********** Buffers ***********////////////////
+        /**
+         * Vertex Buffers
+         */
 
-        // 4 side faces (pyramid). We duplicate verts per face so each face can have flat normal.
-        // Face vertices
-        const P0 = [0.0, 0.75, 0.0]; // top
-        const P1 = [0.5, -0.75, 0.5]; // front-right
-        const P2 = [-0.5, -0.75, 0.5]; // front-left
-        const P3 = [0.5, -0.75, -0.5]; // back-right
-        const P4 = [-0.5, -0.75, -0.5]; // back-left
-
-        // Triangles (per face):
-        // F_front:  (P0, P1, P2)
-        // F_right:  (P0, P3, P1)
-        // F_left:   (P0, P2, P4)
-        // F_back:   (P0, P4, P3)
-
-        const F_front = [P0, P1, P2];
-        const F_right = [P0, P3, P1];
-        const F_left = [P0, P2, P4];
-        const F_back = [P0, P4, P3];
-
-        const N_front = faceNormal(
-          ...(F_front as unknown as [number[], number[], number[]])
-        );
-        const N_right = faceNormal(
-          ...(F_right as unknown as [number[], number[], number[]])
-        );
-        const N_left = faceNormal(
-          ...(F_left as unknown as [number[], number[], number[]])
-        );
-        const N_back = faceNormal(
-          ...(F_back as unknown as [number[], number[], number[]])
-        );
+        const {
+          F_left,
+          F_back,
+          F_front,
+          F_right,
+          N_left,
+          N_back,
+          N_front,
+          N_right,
+        } = getVercelLogoCanvasPositionSides();
 
         // Pre-vertex positions (duplicated per face)
         const positions = new Float32Array([
@@ -175,7 +156,9 @@ export function VercelLogoCanvas() {
           bufferLayoutDescLabel: "Normal Buffer Layout Descriptor",
         });
 
-        ////////////////*********** Uniform Buffers ***********////////////////
+        /**
+         * Uniform Buffers
+         */
 
         const lightDirection = new Float32Array([0, 0, -1.0]);
 
@@ -197,7 +180,9 @@ export function VercelLogoCanvas() {
 
         device.queue.writeBuffer(viewDirectionBuffer, 0, viewDirection);
 
-        ////////////////*********** Model View Matrix ***********////////////////
+        /**
+         * Model View Matrix
+         */
 
         const modelMatrix = mat4.create();
 
@@ -232,7 +217,9 @@ export function VercelLogoCanvas() {
           new Float32Array(viewMatrix)
         );
 
-        ////////////////*********** Normal Matrix ***********////////////////
+        /**
+         * Normal Matrix
+         */
 
         const modelViewMatrix = mat4.multiply(
           mat4.create(),
@@ -262,7 +249,9 @@ export function VercelLogoCanvas() {
           new Float32Array(normalMatrix)
         );
 
-        ////////////////*********** Projection Matrix ***********////////////////
+        /**
+         * Projection Matrix
+         */
 
         const projectionMatrix = mat4.perspective(
           mat4.create(),
@@ -278,13 +267,9 @@ export function VercelLogoCanvas() {
           "Projection Matrix Buffer Descriptor"
         );
 
-        device.queue.writeBuffer(
-          projectionMatrixBuffer,
-          0,
-          new Float32Array(projectionMatrix)
-        );
-
-        ////////////////*********** Bind Group Layout ***********////////////////
+        /**
+         * Bind Group Layout & Bind Group
+         */
 
         const bindGroupLayout = device.createBindGroupLayout({
           label: "Bind Group Layout Descriptor",
@@ -322,8 +307,6 @@ export function VercelLogoCanvas() {
           ],
         });
 
-        ////////////////*********** Bind Group ***********////////////////
-
         const bindGroup = device.createBindGroup({
           label: "Bind Group Descriptor",
           layout: bindGroupLayout,
@@ -355,14 +338,14 @@ export function VercelLogoCanvas() {
           ],
         });
 
-        ////////////////*********** Pipeline Layout ***********////////////////
+        /**
+         * Pipeline Layout & Pipeline
+         */
 
         const pipelineLayout = device.createPipelineLayout({
           label: "Pipeline Layout Descriptor",
           bindGroupLayouts: [bindGroupLayout],
         });
-
-        ////////////////*********** Pipeline ***********////////////////
 
         const pipeline = device.createRenderPipeline({
           label: "Render Pipeline Descriptor",
@@ -390,30 +373,15 @@ export function VercelLogoCanvas() {
           },
         });
 
-        ////////////////*********** Multi-Sample Anti-Aliasing (MSAA) ***********////////////////
-
-        const msaaTexture = device.createTexture({
-          format: canvasFormat,
-          sampleCount: SAMPLE_COUNT,
-          usage: GPUTextureUsage.RENDER_ATTACHMENT,
-          label: "Multi-Sample Anti-Aliasing Texture",
-          size: [canvasRef.current.width, canvasRef.current.height],
-        });
-
-        ////////////////*********** Depth Texture ***********////////////////
-
-        const depthTexture = device.createTexture({
-          dimension: "2d",
-          label: "Depth Texture",
-          sampleCount: SAMPLE_COUNT,
-          format: "depth24plus-stencil8",
-          usage: GPUTextureUsage.RENDER_ATTACHMENT,
-          size: [canvasRef.current.width, canvasRef.current.height, 1],
-        });
-
-        ////////////////*********** Draw Function ***********////////////////
+        /**
+         * Draw Function
+         */
 
         const draw = (timestampInSec: number) => {
+          if (drawCancelled) {
+            return;
+          }
+
           angleRef.current += ROTATION_SPEED * timestampInSec;
 
           // Update model and normal matrix
@@ -453,7 +421,44 @@ export function VercelLogoCanvas() {
             new Float32Array(normalMatrix)
           );
 
-          ////////////////*********** Encoders ***********////////////////
+          /**
+           * Projection Matrix, Depth Texture & Multi-Sample Anti-Aliasing (MSAA)
+           */
+
+          const projectionMatrix = mat4.perspective(
+            mat4.create(),
+            1.4,
+            canvasRef.current!.width / canvasRef.current!.height,
+            0.1,
+            1000.0
+          );
+
+          device.queue.writeBuffer(
+            projectionMatrixBuffer,
+            0,
+            new Float32Array(projectionMatrix)
+          );
+
+          const depthTexture = device.createTexture({
+            dimension: "2d",
+            label: "Depth Texture",
+            sampleCount: SAMPLE_COUNT,
+            format: "depth24plus-stencil8",
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            size: [canvasRef.current!.width, canvasRef.current!.height, 1],
+          });
+
+          const msaaTexture = device.createTexture({
+            format: canvasFormat,
+            sampleCount: SAMPLE_COUNT,
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            label: "Multi-Sample Anti-Aliasing Texture",
+            size: [canvasRef.current!.width, canvasRef.current!.height],
+          });
+
+          /**
+           * Encoder
+           */
 
           const commandEncoder = device.createCommandEncoder();
           const renderPass = commandEncoder.beginRenderPass({
@@ -482,14 +487,16 @@ export function VercelLogoCanvas() {
           renderPass.setVertexBuffer(1, normalBuffer);
           renderPass.setBindGroup(0, bindGroup);
 
-          const vertexCount = 4 /*faces*/ * 3; /*verts per face*/ // = 12
+          const vertexCount = 4 * 3; // faces * verts per face
           renderPass.draw(vertexCount);
 
           renderPass.end();
           device.queue.submit([commandEncoder.finish()]);
         };
 
-        ////////////////*********** Loop Function ***********////////////////
+        /**
+         * Loop Function
+         */
 
         const loop = (timestamp: number) => {
           // Timestamp in seconds
@@ -514,16 +521,46 @@ export function VercelLogoCanvas() {
           rafRef.current = requestAnimationFrame(loop);
         };
 
+        /**
+         * Resize Observer
+         */
+
+        resizeObserverRef.current = new ResizeObserver(() => {
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
+
+          timeoutRef.current = setTimeout(() => {
+            requestAnimationFrame(loop);
+          }, 100);
+        });
+
         rafRef.current = requestAnimationFrame(loop);
+        resizeObserverRef.current.observe(canvasRef.current);
+      }
+    })();
+
+    const canvas = canvasRef.current;
+    return () => {
+      drawCancelled = true;
+
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
       }
 
-      return () => {
-        if (rafRef.current) {
-          cancelAnimationFrame(rafRef.current);
-        }
-      };
-    })();
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      if (resizeObserverRef.current && canvas) {
+        resizeObserverRef.current.unobserve(canvas);
+      }
+    };
   }, []);
+
+  /**
+   * Handlers
+   */
 
   const handleMouseMove: MouseEventHandler<HTMLCanvasElement> = (event) => {
     const canvas = canvasRef.current;
@@ -545,7 +582,7 @@ export function VercelLogoCanvas() {
     let localTranslateX = (mouseX - centerX) / centerX;
     let localTranslateY = (mouseY - centerY) / centerY;
 
-    // screen Y grows down; flip so up is positive
+    // Screen Y grows down; flip so up is positive
     localTranslateY = -localTranslateY;
 
     localTranslateX = Math.max(-1, Math.min(1, localTranslateX)) * MAX_OFFSET;
@@ -564,6 +601,10 @@ export function VercelLogoCanvas() {
     translateX.current = 0;
     translateY.current = 0;
   };
+
+  /**
+   * Return
+   */
 
   return (
     <section className="bg-black min-h-screen w-full relative">
