@@ -38,7 +38,11 @@ npm run dev
 
 ---
 
-![Demo](/public/demo.gif)
+## 👀 How it looks
+
+|                                         |                                         |
+| --------------------------------------- | --------------------------------------- |
+| ![section-one](/public/section-one.png) | ![section-two](/public/section-two.png) |
 
 ---
 

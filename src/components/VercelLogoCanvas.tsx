@@ -532,7 +532,7 @@ export function VercelLogoCanvas() {
 
           timeoutRef.current = setTimeout(() => {
             requestAnimationFrame(loop);
-          }, 100);
+          }, 750);
         });
 
         rafRef.current = requestAnimationFrame(loop);
