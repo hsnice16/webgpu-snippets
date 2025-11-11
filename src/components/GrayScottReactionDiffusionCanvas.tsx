@@ -448,7 +448,7 @@ export function GrayScottReactionDiffusionCanvas() {
   return (
     <section
       id="gray-scott-diffusion"
-      className="bg-white min-h-screen w-full flex items-center justify-center relative"
+      className="bg-white min-h-dvh w-full flex items-center justify-center relative"
     >
       <p className="absolute bg-black text-white text-sm top-4 left-[4vw] px-2 py-1 rounded font-geist-mono">
         Gray-Scott Reaction Diffusion System

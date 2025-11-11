@@ -3,7 +3,6 @@
 import { mat4, vec3 } from "gl-matrix";
 import { useRef, useState, useEffect, MouseEventHandler } from "react";
 
-import { useIsMobile } from "@/hooks";
 import {
   MAX_OFFSET,
   RETURN_SPEED,
@@ -12,6 +11,7 @@ import {
   ROTATION_SPEED,
 } from "@/constants";
 
+import { useIsMobile } from "@/hooks";
 import { checkWebGPUSupport, getVercelLogoCanvasPositionSides } from "@/utils";
 
 import {
@@ -38,8 +38,6 @@ export function VercelLogoCanvas() {
   const rafRef = useRef<number>(undefined);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastTimestampRef = useRef<number>(undefined);
-  const timeoutRef = useRef<NodeJS.Timeout>(undefined);
-  const resizeObserverRef = useRef<ResizeObserver>(undefined);
 
   useEffect(() => {
     let drawCancelled = false;
@@ -521,39 +519,15 @@ export function VercelLogoCanvas() {
           rafRef.current = requestAnimationFrame(loop);
         };
 
-        /**
-         * Resize Observer
-         */
-
-        resizeObserverRef.current = new ResizeObserver(() => {
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-          }
-
-          timeoutRef.current = setTimeout(() => {
-            requestAnimationFrame(loop);
-          }, 750);
-        });
-
         rafRef.current = requestAnimationFrame(loop);
-        resizeObserverRef.current.observe(canvasRef.current);
       }
     })();
 
-    const canvas = canvasRef.current;
     return () => {
       drawCancelled = true;
 
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
-      }
-
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
-      if (resizeObserverRef.current && canvas) {
-        resizeObserverRef.current.unobserve(canvas);
       }
     };
   }, []);
@@ -607,8 +581,8 @@ export function VercelLogoCanvas() {
    */
 
   return (
-    <section className="bg-black min-h-screen w-full relative">
-      <div className="flex items-center justify-center flex-col sm:flex-row min-h-screen sm:min-h-auto">
+    <section className="bg-black min-h-dvh w-full relative">
+      <div className="flex items-center justify-center flex-col sm:flex-row min-h-dvh sm:min-h-auto">
         <div className="sm:flex-1">
           <div className="text-white max-w-[500] m-auto sm:h-[340]">
             <h2 className="text-xl sm:text-5xl font-geist-mono">Vercel</h2>
