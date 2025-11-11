@@ -38,6 +38,8 @@ export function VercelLogoCanvas() {
   const rafRef = useRef<number>(undefined);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastTimestampRef = useRef<number>(undefined);
+  const lastCanvasWidthRef = useRef<number>(undefined);
+  const lastCanvasHeightRef = useRef<number>(undefined);
 
   useEffect(() => {
     let drawCancelled = false;
@@ -251,24 +253,10 @@ export function VercelLogoCanvas() {
          * Projection Matrix
          */
 
-        const projectionMatrix = mat4.perspective(
-          mat4.create(),
-          1.4,
-          canvasRef.current.width / canvasRef.current.height,
-          0.1,
-          1000.0
-        );
-
         const projectionMatrixBuffer = createUniformBuffer(
           device,
-          projectionMatrix.length * 4, // 16 floats * 4 bytes
+          16 * 4, // 16 floats * 4 bytes
           "Projection Matrix Buffer Descriptor"
-        );
-
-        device.queue.writeBuffer(
-          projectionMatrixBuffer,
-          0,
-          new Float32Array(projectionMatrix)
         );
 
         /**
@@ -378,33 +366,71 @@ export function VercelLogoCanvas() {
         });
 
         /**
-         * Depth Texture & Multi-Sample Anti-Aliasing (MSAA)
+         * Get Canvas Size Dependent Configs Function
          */
 
-        const depthTexture = device.createTexture({
-          dimension: "2d",
-          label: "Depth Texture",
-          sampleCount: SAMPLE_COUNT,
-          format: "depth24plus-stencil8",
-          usage: GPUTextureUsage.RENDER_ATTACHMENT,
-          size: [canvasRef.current!.width, canvasRef.current!.height, 1],
-        });
+        const getCanvasSizeDependentConfigs = () => {
+          /**
+           * Projection Marix
+           */
 
-        const msaaTexture = device.createTexture({
-          format: canvasFormat,
-          sampleCount: SAMPLE_COUNT,
-          usage: GPUTextureUsage.RENDER_ATTACHMENT,
-          label: "Multi-Sample Anti-Aliasing Texture",
-          size: [canvasRef.current!.width, canvasRef.current!.height],
-        });
+          const projectionMatrix = mat4.perspective(
+            mat4.create(),
+            1.4,
+            canvasRef.current!.width / canvasRef.current!.height,
+            0.1,
+            1000.0
+          );
+
+          device.queue.writeBuffer(
+            projectionMatrixBuffer,
+            0,
+            new Float32Array(projectionMatrix)
+          );
+
+          /**
+           * Depth Texture & Multi-Sample Anti-Aliasing (MSAA)
+           */
+
+          const depthTexture = device.createTexture({
+            dimension: "2d",
+            label: "Depth Texture",
+            sampleCount: SAMPLE_COUNT,
+            format: "depth24plus-stencil8",
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            size: [canvasRef.current!.width, canvasRef.current!.height, 1],
+          });
+
+          const msaaTexture = device.createTexture({
+            format: canvasFormat,
+            sampleCount: SAMPLE_COUNT,
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            label: "Multi-Sample Anti-Aliasing Texture",
+            size: [canvasRef.current!.width, canvasRef.current!.height],
+          });
+
+          return { depthTexture, msaaTexture };
+        };
 
         /**
          * Draw Function
          */
 
+        let { depthTexture, msaaTexture } = getCanvasSizeDependentConfigs();
+
         const draw = (timestampInSec: number) => {
           if (drawCancelled) {
             return;
+          }
+
+          if (
+            lastCanvasHeightRef.current !== canvasRef.current?.height ||
+            lastCanvasWidthRef.current !== canvasRef.current?.width
+          ) {
+            ({ depthTexture, msaaTexture } = getCanvasSizeDependentConfigs());
+
+            lastCanvasWidthRef.current = canvasRef.current?.width;
+            lastCanvasHeightRef.current = canvasRef.current?.height;
           }
 
           angleRef.current += ROTATION_SPEED * timestampInSec;
