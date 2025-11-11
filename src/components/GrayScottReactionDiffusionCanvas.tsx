@@ -436,7 +436,7 @@ export function GrayScottReactionDiffusionCanvas() {
         Click & drag the pen to see the pattern
       </p>
 
-      <div className="w-[92vw] h-[82vh]">
+      <div className="w-[92vw] h-[82vh] -mb-6 sm:mb-0">
         {message ? (
           <h4 className="font-geist-sans">{message}</h4>
         ) : (
