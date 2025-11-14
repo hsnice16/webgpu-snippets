@@ -1,6 +1,6 @@
 "use client";
 
-import { MouseEventHandler, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, PointerEventHandler } from "react";
 
 import { DIFFUSION_SIMULATION_TEXTURE_SIZE } from "@/constants";
 import { checkWebGPUSupport, resizeCanvasForWebGPU } from "@/utils";
@@ -407,8 +407,8 @@ export function GrayScottReactionDiffusionCanvas() {
    * Handlers
    */
 
-  const handleMouseMove: MouseEventHandler<HTMLCanvasElement> = (event) => {
-    if (isDragging) {
+  const handlePointerMove: PointerEventHandler<HTMLCanvasElement> = (event) => {
+    if (event.isPrimary && isDragging) {
       const canvas = canvasRef.current;
       if (canvas) {
         const rect = canvas.getBoundingClientRect();
@@ -432,13 +432,17 @@ export function GrayScottReactionDiffusionCanvas() {
     }
   };
 
-  const handleMouseDown = () => {
-    setIsDragging(true);
+  const handlePointerDown: PointerEventHandler<HTMLCanvasElement> = (event) => {
+    if (event.isPrimary) {
+      setIsDragging(true);
+    }
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    drawPositionRef.current.set([0.0, 0.0, 0.0], 0);
+  const handlePointerUp: PointerEventHandler<HTMLCanvasElement> = (event) => {
+    if (event.isPrimary) {
+      setIsDragging(false);
+      drawPositionRef.current.set([0.0, 0.0, 0.0], 0);
+    }
   };
 
   /**
@@ -464,12 +468,9 @@ export function GrayScottReactionDiffusionCanvas() {
         ) : (
           <canvas
             ref={canvasRef}
-            onMouseUp={handleMouseUp}
-            onPointerUp={handleMouseUp}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onPointerDown={handleMouseDown}
-            onPointerMove={handleMouseMove}
+            onPointerUp={handlePointerUp}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
             className="w-full h-full border cursor-pen"
           ></canvas>
         )}

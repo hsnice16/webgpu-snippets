@@ -1,7 +1,7 @@
 "use client";
 
 import { mat4, vec3 } from "gl-matrix";
-import { useRef, useState, useEffect, MouseEventHandler } from "react";
+import { useRef, useState, useEffect, PointerEventHandler } from "react";
 
 import {
   MAX_OFFSET,
@@ -554,44 +554,50 @@ export function VercelLogoCanvas() {
    * Handlers
    */
 
-  const handleMouseMove: MouseEventHandler<HTMLCanvasElement> = (event) => {
-    const canvas = canvasRef.current;
-    if (!canvas) {
-      translateX.current = 0;
-      translateY.current = 0;
-      return;
+  const handlePointerMove: PointerEventHandler<HTMLCanvasElement> = (event) => {
+    if (event.isPrimary) {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        translateX.current = 0;
+        translateY.current = 0;
+        return;
+      }
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      const clientRect = canvas.getBoundingClientRect();
+
+      const mouseX = event.clientX - clientRect.left;
+      const mouseY = event.clientY - clientRect.top;
+
+      // Normalize to [-1, 1]
+      let localTranslateX = (mouseX - centerX) / centerX;
+      let localTranslateY = (mouseY - centerY) / centerY;
+
+      // Screen Y grows down; flip so up is positive
+      localTranslateY = -localTranslateY;
+
+      localTranslateX = Math.max(-1, Math.min(1, localTranslateX)) * MAX_OFFSET;
+      localTranslateY = Math.max(-1, Math.min(1, localTranslateY)) * MAX_OFFSET;
+
+      localTranslateY = Number(localTranslateY.toFixed(4));
+      localTranslateX = Number(localTranslateX.toFixed(4));
+
+      translateX.current = localTranslateX;
+      translateY.current = localTranslateY;
+
+      lastMouseMoveAtRef.current = performance.now();
     }
-
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-
-    const clientRect = canvas.getBoundingClientRect();
-
-    const mouseX = event.clientX - clientRect.left;
-    const mouseY = event.clientY - clientRect.top;
-
-    // Normalize to [-1, 1]
-    let localTranslateX = (mouseX - centerX) / centerX;
-    let localTranslateY = (mouseY - centerY) / centerY;
-
-    // Screen Y grows down; flip so up is positive
-    localTranslateY = -localTranslateY;
-
-    localTranslateX = Math.max(-1, Math.min(1, localTranslateX)) * MAX_OFFSET;
-    localTranslateY = Math.max(-1, Math.min(1, localTranslateY)) * MAX_OFFSET;
-
-    localTranslateY = Number(localTranslateY.toFixed(4));
-    localTranslateX = Number(localTranslateX.toFixed(4));
-
-    translateX.current = localTranslateX;
-    translateY.current = localTranslateY;
-
-    lastMouseMoveAtRef.current = performance.now();
   };
 
-  const handleMouseLeave = () => {
-    translateX.current = 0;
-    translateY.current = 0;
+  const handlePointerLeave: PointerEventHandler<HTMLCanvasElement> = (
+    event
+  ) => {
+    if (event.isPrimary) {
+      translateX.current = 0;
+      translateY.current = 0;
+    }
   };
 
   /**
@@ -621,10 +627,8 @@ export function VercelLogoCanvas() {
               ref={canvasRef}
               width={isMobile ? 420 : 840}
               height={isMobile ? 420 : 840}
-              onMouseMove={handleMouseMove}
-              onMouseLeave={handleMouseLeave}
-              onPointerMove={handleMouseMove}
-              onPointerLeave={handleMouseLeave}
+              onPointerMove={handlePointerMove}
+              onPointerLeave={handlePointerLeave}
             />
           )}
         </div>
