@@ -471,7 +471,7 @@ export function GrayScottReactionDiffusionCanvas() {
             onPointerUp={handlePointerUp}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
-            className="w-full h-full border cursor-pen"
+            className="w-full h-full border cursor-pen touch-none"
           ></canvas>
         )}
       </div>
