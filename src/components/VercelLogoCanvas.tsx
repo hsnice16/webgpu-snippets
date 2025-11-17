@@ -619,7 +619,7 @@ export function VercelLogoCanvas() {
           </div>
         </div>
 
-        <div className="text-white lg:flex-1 flex items-center justify-center">
+        <div className="text-white lg:flex-1 flex items-center justify-center touch-none">
           {message ? (
             <h4 className="font-geist-sans">{message}</h4>
           ) : (
