@@ -15,6 +15,7 @@ import {
 
 import computeCode from "./shaders/gray-scott-diffusion-compute-shader.wgsl";
 import renderCode from "./shaders/gray-scott-diffusion-render-shader.wgsl";
+import { SectionInfoPara } from "./ui";
 
 export function GrayScottReactionDiffusionCanvas() {
   const [message, setMessage] = useState("");
@@ -454,13 +455,11 @@ export function GrayScottReactionDiffusionCanvas() {
       id="gray-scott-diffusion"
       className="bg-white min-h-dvh w-full flex items-center justify-center relative"
     >
-      <p className="absolute bg-black text-white text-sm top-4 left-[4vw] px-2 py-1 rounded font-geist-mono">
-        Gray-Scott Reaction Diffusion System
-      </p>
-
-      <p className="absolute bg-black text-white text-sm top-12 left-[4vw] px-2 py-1 rounded font-geist-mono">
-        Click & drag the pen to see the pattern
-      </p>
+      <SectionInfoPara text="Gray-Scott Reaction Diffusion System" />
+      <SectionInfoPara
+        order={2}
+        text="Click & drag the pen to see the pattern"
+      />
 
       <div className="w-[92vw] h-[82vh] -mb-6 sm:mb-0">
         {message ? (

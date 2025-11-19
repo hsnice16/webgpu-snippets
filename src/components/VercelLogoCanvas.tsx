@@ -24,7 +24,7 @@ import {
 } from "@/utils/webgpu";
 
 import code from "./shaders/vercel-logo-shader.wgsl";
-import { AnimatedDownArrow } from "./ui";
+import { AnimatedDownArrow, SectionInfoPara } from "./ui";
 
 export function VercelLogoCanvas() {
   const isMobile = useIsMobile();
@@ -606,33 +606,29 @@ export function VercelLogoCanvas() {
 
   return (
     <section className="bg-black min-h-dvh w-full relative">
-      <div className="flex items-center justify-center flex-col lg:flex-row min-h-dvh lg:min-h-auto">
-        <div className="lg:flex-1">
-          <div className="text-white max-w-[500] m-auto lg:h-[340]">
-            <h2 className="text-xl sm:text-3xl lg:text-5xl font-geist-mono">
-              Vercel
-            </h2>
+      <SectionInfoPara text="Vercel Theme Inspired" light />
 
-            <p className="text-lg sm:text-xl lg:text-2xl font-geist-sans">
-              Build and deploy on the AI Cloud.
-            </p>
-          </div>
-        </div>
-
-        <div className="text-white lg:flex-1 flex items-center justify-center touch-none">
-          {message ? (
-            <h4 className="font-geist-sans">{message}</h4>
-          ) : (
-            <canvas
-              ref={canvasRef}
-              width={isMobile ? 420 : 840}
-              height={isMobile ? 420 : 840}
-              onPointerMove={handlePointerMove}
-              onPointerLeave={handlePointerLeave}
-            />
-          )}
-        </div>
+      <div className="text-white flex">
+        {message ? (
+          <h4
+            className={`font-geist-sans mx-auto flex items-center justify-center ${
+              isMobile ? "w-[420px] h-[420px]" : "w-[840px] h-[840px]"
+            }`}
+          >
+            {message}
+          </h4>
+        ) : (
+          <canvas
+            ref={canvasRef}
+            width={isMobile ? 420 : 840}
+            height={isMobile ? 420 : 840}
+            onPointerMove={handlePointerMove}
+            onPointerLeave={handlePointerLeave}
+            className="touch-none mx-auto mt-24 sm:mt-auto"
+          />
+        )}
       </div>
+      {/* </div> */}
 
       <AnimatedDownArrow />
     </section>
