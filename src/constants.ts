@@ -6,3 +6,6 @@ export const RETURN_IDLE_MS = 150; // after this many ms without mousemove, star
 export const RETURN_SPEED = 6; // higher = faster return (units per second)
 
 export const DIFFUSION_SIMULATION_TEXTURE_SIZE = 1024;
+
+export const YAW_PITCH = 1;
+export const ROLL = 2;

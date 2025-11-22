@@ -1,5 +1,6 @@
 import {
   GrayScottReactionDiffusionCanvas,
+  VercelLogoArcBallCanvas,
   VercelLogoCanvas,
 } from "@/components";
 
@@ -8,6 +9,7 @@ export default function Home() {
     <main className="overflow-hidden">
       <VercelLogoCanvas />
       <GrayScottReactionDiffusionCanvas />
+      <VercelLogoArcBallCanvas />
     </main>
   );
 }

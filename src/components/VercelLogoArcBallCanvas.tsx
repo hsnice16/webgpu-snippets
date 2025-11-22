@@ -1,19 +1,18 @@
 "use client";
 
 import clsx from "clsx";
-import { mat4, vec3 } from "gl-matrix";
+import { mat4 } from "gl-matrix";
 import { useRef, useState, useEffect, PointerEventHandler } from "react";
 
-import {
-  MAX_OFFSET,
-  RETURN_SPEED,
-  SAMPLE_COUNT,
-  RETURN_IDLE_MS,
-  ROTATION_SPEED,
-} from "@/constants";
-
+import { ROLL, SAMPLE_COUNT, YAW_PITCH } from "@/constants";
 import { useIsMobile } from "@/hooks";
-import { checkWebGPUSupport, getVercelLogoCanvasPositionSides } from "@/utils";
+
+import {
+  Arcball,
+  getCursorPosition,
+  checkWebGPUSupport,
+  getVercelLogoCanvasPositionSides,
+} from "@/utils";
 
 import {
   getDevice,
@@ -24,21 +23,22 @@ import {
   createVertexBufferLayoutDesc,
 } from "@/utils/webgpu";
 
-import code from "./shaders/vercel-logo-shader.wgsl";
-import { AnimatedDownArrow, SectionInfoPara } from "./ui";
+import code from "./shaders/vercel-logo-arc-ball-shader.wgsl";
+import { SectionInfoPara } from "./ui";
 
-export function VercelLogoCanvas() {
+export function VercelLogoArcBallCanvas() {
   const isMobile = useIsMobile();
   const [message, setMessage] = useState("");
+  const [isPointerDown, setIsPointerDown] = useState(false);
 
-  const angleRef = useRef(0);
-  const translateX = useRef(0);
-  const translateY = useRef(0);
-  const lastMouseMoveAtRef = useRef(0);
+  const prevXRef = useRef(0.0);
+  const prevYRef = useRef(0.0);
+  const isDraggingRef = useRef(0);
+  const arcballRef = useRef<Arcball>(undefined);
+  const drawRef = useRef<() => void>(undefined);
 
   const rafRef = useRef<number>(undefined);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const lastTimestampRef = useRef<number>(undefined);
   const lastCanvasWidthRef = useRef<number>(undefined);
   const lastCanvasHeightRef = useRef<number>(undefined);
 
@@ -185,48 +185,25 @@ export function VercelLogoCanvas() {
          * Model View Matrix
          */
 
-        const modelMatrix = mat4.create();
+        arcballRef.current = new Arcball();
 
-        const modelMatrixBuffer = createUniformBuffer(
+        const modelViewMatrix = arcballRef.current.getMatrices();
+
+        const modelViewMatrixBuffer = createUniformBuffer(
           device,
-          modelMatrix.length * 4, // 16 floats * 4 bytes
-          "Model Matrix Buffer Descriptor"
-        );
-
-        device.queue.writeBuffer(
-          modelMatrixBuffer,
-          0,
-          new Float32Array(modelMatrix)
-        );
-
-        const viewMatrix = mat4.lookAt(
-          mat4.create(),
-          vec3.fromValues(1, -1, 1),
-          vec3.fromValues(0, 0, 0),
-          vec3.fromValues(0.0, 1.0, 0.0)
-        );
-
-        const viewMatrixBuffer = createUniformBuffer(
-          device,
-          viewMatrix.length * 4, // 16 floats * 4 bytes
+          modelViewMatrix.length * 4, // 16 floats * 4 bytes
           "View Matrix Buffer Descriptor"
         );
 
         device.queue.writeBuffer(
-          viewMatrixBuffer,
+          modelViewMatrixBuffer,
           0,
-          new Float32Array(viewMatrix)
+          new Float32Array(modelViewMatrix)
         );
 
         /**
          * Normal Matrix
          */
-
-        const modelViewMatrix = mat4.multiply(
-          mat4.create(),
-          viewMatrix,
-          modelMatrix
-        );
 
         const modelViewMatrixInverse = mat4.invert(
           mat4.create(),
@@ -292,11 +269,6 @@ export function VercelLogoCanvas() {
               visibility: GPUShaderStage.VERTEX,
               buffer: {},
             },
-            {
-              binding: 5,
-              visibility: GPUShaderStage.VERTEX,
-              buffer: {},
-            },
           ],
         });
 
@@ -306,26 +278,22 @@ export function VercelLogoCanvas() {
           entries: [
             {
               binding: 0,
-              resource: { buffer: modelMatrixBuffer },
+              resource: { buffer: modelViewMatrixBuffer },
             },
             {
               binding: 1,
-              resource: { buffer: viewMatrixBuffer },
-            },
-            {
-              binding: 2,
               resource: { buffer: projectionMatrixBuffer },
             },
             {
-              binding: 3,
+              binding: 2,
               resource: { buffer: normalMatrixBuffer },
             },
             {
-              binding: 4,
+              binding: 3,
               resource: { buffer: lightDirectionBuffer },
             },
             {
-              binding: 5,
+              binding: 4,
               resource: { buffer: viewDirectionBuffer },
             },
           ],
@@ -419,7 +387,7 @@ export function VercelLogoCanvas() {
 
         let { depthTexture, msaaTexture } = getCanvasSizeDependentConfigs();
 
-        const draw = (timestampInSec: number) => {
+        drawRef.current = () => {
           if (drawCancelled) {
             return;
           }
@@ -434,44 +402,32 @@ export function VercelLogoCanvas() {
             lastCanvasHeightRef.current = canvasRef.current?.height;
           }
 
-          angleRef.current += ROTATION_SPEED * timestampInSec;
+          if (arcballRef.current) {
+            // Update model-view and normal matrix
+            const modelViewMatrix = arcballRef.current.getMatrices();
 
-          // Update model and normal matrix
-          const modelMatrix = mat4.create();
-          mat4.translate(
-            modelMatrix,
-            modelMatrix,
-            vec3.fromValues(translateX.current, translateY.current, 0)
-          );
-          mat4.rotateY(modelMatrix, modelMatrix, angleRef.current);
+            const modelViewMatrixInverse = mat4.invert(
+              mat4.create(),
+              modelViewMatrix
+            );
 
-          const modelViewMatrix = mat4.multiply(
-            mat4.create(),
-            viewMatrix,
-            modelMatrix
-          );
+            const normalMatrix = mat4.transpose(
+              mat4.create(),
+              modelViewMatrixInverse!
+            );
 
-          const modelViewMatrixInverse = mat4.invert(
-            mat4.create(),
-            modelViewMatrix
-          );
-
-          const normalMatrix = mat4.transpose(
-            mat4.create(),
-            modelViewMatrixInverse!
-          );
-
-          // Upload uniforms
-          device.queue.writeBuffer(
-            modelMatrixBuffer,
-            0,
-            new Float32Array(modelMatrix)
-          );
-          device.queue.writeBuffer(
-            normalMatrixBuffer,
-            0,
-            new Float32Array(normalMatrix)
-          );
+            // Upload uniforms
+            device.queue.writeBuffer(
+              modelViewMatrixBuffer,
+              0,
+              new Float32Array(modelViewMatrix)
+            );
+            device.queue.writeBuffer(
+              normalMatrixBuffer,
+              0,
+              new Float32Array(normalMatrix)
+            );
+          }
 
           /**
            * Encoder
@@ -511,34 +467,7 @@ export function VercelLogoCanvas() {
           device.queue.submit([commandEncoder.finish()]);
         };
 
-        /**
-         * Loop Function
-         */
-
-        const loop = (timestamp: number) => {
-          // Timestamp in seconds
-          const lastTimestamp = lastTimestampRef.current ?? timestamp;
-          const timestampInSec = Math.min(
-            (timestamp - lastTimestamp) / 1000,
-            0.1
-          );
-
-          // Smooth return to center after inactivity
-          const now = performance.now();
-          if (now - (lastMouseMoveAtRef.current || 0) > RETURN_IDLE_MS) {
-            const t = Math.min(1, RETURN_SPEED * timestampInSec);
-
-            translateX.current += (0 - translateX.current) * t;
-            translateY.current += (0 - translateY.current) * t;
-          }
-
-          lastTimestampRef.current = timestamp;
-
-          draw(timestampInSec);
-          rafRef.current = requestAnimationFrame(loop);
-        };
-
-        rafRef.current = requestAnimationFrame(loop);
+        rafRef.current = requestAnimationFrame(drawRef.current);
       }
     })();
 
@@ -555,49 +484,77 @@ export function VercelLogoCanvas() {
    * Handlers
    */
 
-  const handlePointerMove: PointerEventHandler<HTMLCanvasElement> = (event) => {
+  const handlePointerUp: PointerEventHandler<HTMLCanvasElement> = (event) => {
     if (event.isPrimary) {
-      const canvas = canvasRef.current;
-      if (!canvas) {
-        translateX.current = 0;
-        translateY.current = 0;
-        return;
-      }
-
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-
-      const clientRect = canvas.getBoundingClientRect();
-
-      const mouseX = event.clientX - clientRect.left;
-      const mouseY = event.clientY - clientRect.top;
-
-      // Normalize to [-1, 1]
-      let localTranslateX = (mouseX - centerX) / centerX;
-      let localTranslateY = (mouseY - centerY) / centerY;
-
-      // Screen Y grows down; flip so up is positive
-      localTranslateY = -localTranslateY;
-
-      localTranslateX = Math.max(-1, Math.min(1, localTranslateX)) * MAX_OFFSET;
-      localTranslateY = Math.max(-1, Math.min(1, localTranslateY)) * MAX_OFFSET;
-
-      localTranslateY = Number(localTranslateY.toFixed(4));
-      localTranslateX = Number(localTranslateX.toFixed(4));
-
-      translateX.current = localTranslateX;
-      translateY.current = localTranslateY;
-
-      lastMouseMoveAtRef.current = performance.now();
+      isDraggingRef.current = 0;
+      setIsPointerDown(false);
     }
   };
 
-  const handlePointerLeave: PointerEventHandler<HTMLCanvasElement> = (
-    event
-  ) => {
+  const handlePointerDown: PointerEventHandler<HTMLCanvasElement> = (event) => {
     if (event.isPrimary) {
-      translateX.current = 0;
-      translateY.current = 0;
+      const canvas = canvasRef.current;
+      setIsPointerDown(true);
+
+      if (canvas) {
+        const { posX, posY } = getCursorPosition(
+          event.clientX,
+          event.clientY,
+          canvas
+        );
+
+        prevXRef.current = posX;
+        prevYRef.current = posY;
+
+        if (
+          prevXRef.current * prevXRef.current +
+            prevYRef.current * prevYRef.current <
+          0.64
+        ) {
+          isDraggingRef.current = YAW_PITCH;
+        } else {
+          isDraggingRef.current = ROLL;
+        }
+      }
+    }
+  };
+
+  const handlePointerMove: PointerEventHandler<HTMLCanvasElement> = (event) => {
+    if (
+      drawRef.current &&
+      event.isPrimary &&
+      arcballRef.current &&
+      isDraggingRef.current !== 0
+    ) {
+      const canvas = canvasRef.current;
+
+      if (canvas) {
+        const { posX, posY } = getCursorPosition(
+          event.clientX,
+          event.clientY,
+          canvas
+        );
+
+        if (isDraggingRef.current === YAW_PITCH) {
+          arcballRef.current.yawPitch(
+            prevXRef.current,
+            prevYRef.current,
+            posX,
+            posY
+          );
+        } else if (isDraggingRef.current === ROLL) {
+          arcballRef.current.roll(
+            prevXRef.current,
+            prevYRef.current,
+            posX,
+            posY
+          );
+        }
+
+        prevXRef.current = posX;
+        prevYRef.current = posY;
+        rafRef.current = requestAnimationFrame(drawRef.current);
+      }
     }
   };
 
@@ -606,20 +563,15 @@ export function VercelLogoCanvas() {
    */
 
   return (
-    <section className="bg-black min-h-dvh w-full relative">
-      <SectionInfoPara light text="Rotate and Translate" />
+    <section
+      id="vercel-logo-arc-ball"
+      className="bg-black min-h-dvh w-full relative"
+    >
+      <SectionInfoPara light text="Arcball Camera Control" />
       <SectionInfoPara
         light
         order={2}
-        className="max-w-xs sm:max-w-full"
-        text="Hover the pointer on the figure and move to see the translation"
-      />
-      <SectionInfoPara
-        light
-        showDot
-        direction="right"
-        className="right-0"
-        text="Vercel Inspired Theme"
+        text="Grab & drag the figure to see it in action"
       />
 
       <div className="text-white flex">
@@ -640,14 +592,16 @@ export function VercelLogoCanvas() {
             ref={canvasRef}
             width={isMobile ? 420 : 840}
             height={isMobile ? 420 : 840}
+            onPointerUp={handlePointerUp}
+            onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
-            onPointerLeave={handlePointerLeave}
-            className="touch-none mx-auto mt-24 sm:mt-auto"
+            className={clsx("touch-none mx-auto mt-24 sm:mt-auto", {
+              "cursor-grab": !isPointerDown,
+              "cursor-grabbing": isPointerDown,
+            })}
           />
         )}
       </div>
-
-      <AnimatedDownArrow href="#gray-scott-diffusion" />
     </section>
   );
 }

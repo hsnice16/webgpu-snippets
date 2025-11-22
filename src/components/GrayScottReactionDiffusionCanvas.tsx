@@ -15,7 +15,7 @@ import {
 
 import computeCode from "./shaders/gray-scott-diffusion-compute-shader.wgsl";
 import renderCode from "./shaders/gray-scott-diffusion-render-shader.wgsl";
-import { SectionInfoPara } from "./ui";
+import { AnimatedDownArrow, SectionInfoPara } from "./ui";
 
 export function GrayScottReactionDiffusionCanvas() {
   const [message, setMessage] = useState("");
@@ -474,6 +474,8 @@ export function GrayScottReactionDiffusionCanvas() {
           ></canvas>
         )}
       </div>
+
+      <AnimatedDownArrow href="#vercel-logo-arc-ball" light />
     </section>
   );
 }
