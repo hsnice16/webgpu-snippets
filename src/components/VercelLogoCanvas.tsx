@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import { mat4, vec3 } from "gl-matrix";
 import { useRef, useState, useEffect, PointerEventHandler } from "react";
 
@@ -606,14 +607,31 @@ export function VercelLogoCanvas() {
 
   return (
     <section className="bg-black min-h-dvh w-full relative">
-      <SectionInfoPara text="Vercel Theme Inspired" light />
+      <SectionInfoPara light text="Rotate and Translate" />
+      <SectionInfoPara
+        light
+        order={2}
+        className="max-w-xs sm:max-w-full"
+        text="Hover the pointer on the figure and move to see the translation"
+      />
+      <SectionInfoPara
+        light
+        showDot
+        direction="right"
+        className="right-0"
+        text="Vercel Inspired Theme"
+      />
 
       <div className="text-white flex">
         {message ? (
           <h4
-            className={`font-geist-sans mx-auto flex items-center justify-center ${
-              isMobile ? "w-[420px] h-[420px]" : "w-[840px] h-[840px]"
-            }`}
+            className={clsx(
+              "font-geist-sans mx-auto flex items-center justify-center",
+              {
+                "w-[420px] h-[420px]": isMobile,
+                "w-[840px] h-[840px]": !isMobile,
+              }
+            )}
           >
             {message}
           </h4>
